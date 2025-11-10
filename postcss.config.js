@@ -3,4 +3,6 @@ export default {
     tailwindcss: {},
     autoprefixer: {},
   },
-}
+  from: undefined, // 👈 add this line
+};
+

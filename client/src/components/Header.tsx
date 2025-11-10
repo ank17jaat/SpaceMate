@@ -27,16 +27,16 @@ export function Header() {
                 className="font-medium"
                 data-testid="link-hotels"
               >
-                Hotels
+                Office Spaces
               </Button>
             </Link>
-            <Link href="/office-spaces">
+            <Link href="/hotels">
               <Button 
-                variant={location === '/office-spaces' ? 'secondary' : 'ghost'}
+                variant={location === '/hotels' ? 'secondary' : 'ghost'}
                 className="font-medium"
                 data-testid="link-offices"
               >
-                Office Spaces
+                Hotels
               </Button>
             </Link>
             {isSignedIn && (
@@ -93,16 +93,16 @@ export function Header() {
                   className="w-full justify-start font-medium"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Hotels
+                  Office Spaces
                 </Button>
               </Link>
-              <Link href="/office-spaces">
+              <Link href="/hotels">
                 <Button 
-                  variant={location === '/office-spaces' ? 'secondary' : 'ghost'}
+                  variant={location === '/hotels' ? 'secondary' : 'ghost'}
                   className="w-full justify-start font-medium"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Office Spaces
+                  Hotels
                 </Button>
               </Link>
               {isSignedIn && (

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Property, SearchPropertiesParams } from '@shared/schema';
-import { Hero } from '@/components/Hero';
+// import { Hero } from '@/components/Hero';
 import { PropertyCard } from '@/components/PropertyCard';
 import { SearchFilters } from '@/components/SearchFilters';
 import { useState } from 'react';
@@ -19,7 +19,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Hero />
+      {/* <Hero /> */}
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">

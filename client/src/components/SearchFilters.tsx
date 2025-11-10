@@ -95,7 +95,7 @@ export function SearchFilters({ onFilterChange, propertyType }: SearchFiltersPro
             </div>
 
             <div className="space-y-3">
-              <Label>Price Range (${priceRange[0]} - ${priceRange[1]})</Label>
+              <Label>Price Range (₹{priceRange[0]} - ₹{priceRange[1]})</Label>
               <Slider
                 value={priceRange}
                 onValueChange={setPriceRange}

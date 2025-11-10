@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Property, SearchPropertiesParams } from '@shared/schema';
+import { Hero } from '@/components/Hero';
 import { PropertyCard } from '@/components/PropertyCard';
 import { SearchFilters } from '@/components/SearchFilters';
 import { useState } from 'react';
@@ -18,6 +19,7 @@ export default function OfficeSpaces() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Hero />
       <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background py-16 border-b">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-4">

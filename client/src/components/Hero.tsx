@@ -9,14 +9,14 @@ import heroImage from '@assets/generated_images/Luxury_hotel_lobby_hero_dad4bd16
 
 export function Hero() {
   const [, setLocation] = useLocation();
-  const [searchType, setSearchType] = useState<'hotel' | 'office'>('hotel');
+  const [searchType, setSearchType] = useState<'office' | 'hotel'>('office');
   const [searchCity, setSearchCity] = useState('');
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
     if (searchCity) params.set('city', searchCity);
-    const path = searchType === 'hotel' ? '/' : '/office-spaces';
+    const path = searchType === 'hotel' ? '/' : '/hotels';
     setLocation(`${path}?${params.toString()}`);
   };
 
@@ -40,16 +40,6 @@ export function Hero() {
           <div className="flex gap-2 mb-6">
             <Button
               type="button"
-              variant={searchType === 'hotel' ? 'default' : 'outline'}
-              onClick={() => setSearchType('hotel')}
-              className="flex-1"
-              data-testid="button-search-hotels"
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Hotels
-            </Button>
-            <Button
-              type="button"
               variant={searchType === 'office' ? 'default' : 'outline'}
               onClick={() => setSearchType('office')}
               className="flex-1"
@@ -57,6 +47,16 @@ export function Hero() {
             >
               <Briefcase className="h-4 w-4 mr-2" />
               Office Spaces
+            </Button>
+            <Button
+              type="button"
+              variant={searchType === 'hotel' ? 'default' : 'outline'}
+              onClick={() => setSearchType('hotel')}
+              className="flex-1"
+              data-testid="button-search-hotels"
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Hotels
             </Button>
           </div>
 

@@ -16,7 +16,7 @@ export function Header() {
           <Link href="/">
             <div className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-md px-3 py-2 -ml-3 cursor-pointer" data-testid="link-home">
               <Building2 className="h-7 w-7 text-primary" />
-              <span className="text-2xl font-bold text-foreground">Stayu</span>
+              <span className="text-2xl font-bold text-foreground">SpaceMate</span>
             </div>
           </Link>
 
@@ -30,7 +30,7 @@ export function Header() {
                 Office Spaces
               </Button>
             </Link>
-            <Link href="/hotels">
+            {/* <Link href="/hotels">
               <Button 
                 variant={location === '/hotels' ? 'secondary' : 'ghost'}
                 className="font-medium"
@@ -38,7 +38,7 @@ export function Header() {
               >
                 Hotels
               </Button>
-            </Link>
+            </Link> */}
             {isSignedIn && (
               <Link href="/my-bookings">
                 <Button 

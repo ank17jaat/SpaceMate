@@ -40,15 +40,15 @@ export function Hero() {
           <div className="flex gap-2 mb-6">
             <Button
               type="button"
-              variant={searchType === 'office' ? 'default' : 'outline'}
-              onClick={() => setSearchType('office')}
+              // variant={searchType === 'office' ? 'default' : 'outline'}
+              // onClick={() => setSearchType('office')}
               className="flex-1"
               data-testid="button-search-offices"
             >
               <Briefcase className="h-4 w-4 mr-2" />
               Office Spaces
             </Button>
-            <Button
+            {/* <Button
               type="button"
               variant={searchType === 'hotel' ? 'default' : 'outline'}
               onClick={() => setSearchType('hotel')}
@@ -57,7 +57,7 @@ export function Hero() {
             >
               <MapPin className="h-4 w-4 mr-2" />
               Hotels
-            </Button>
+            </Button> */}
           </div>
 
           <form onSubmit={handleSearch} className="space-y-4">

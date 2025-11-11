@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ClerkProvider } from "@/lib/clerk";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import Home from "@/pages/Home";
 import OfficeSpaces from "@/pages/OfficeSpaces";
 import PropertyDetail from "@/pages/PropertyDetail";
@@ -30,9 +31,12 @@ function App() {
     <ClerkProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <div className="min-h-screen bg-background">
+          <div className="min-h-screen bg-background flex flex-col">
             <Header />
-            <Router />
+            <div className="flex-grow">
+              <Router />
+            </div>
+            <Footer />
           </div>
           <Toaster />
         </TooltipProvider>

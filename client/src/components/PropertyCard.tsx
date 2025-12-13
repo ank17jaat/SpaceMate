@@ -129,7 +129,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
               <div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold" data-testid="text-price">
-                    ${property.pricePerNight}
+                    ₹{property.pricePerNight}
                   </span>
                   <span className="text-muted-foreground text-sm">
                     / {property.type === 'hotel' ? 'night' : 'day'}

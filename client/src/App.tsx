@@ -11,6 +11,8 @@ import OfficeSpaces from "@/pages/OfficeSpaces";
 import PropertyDetail from "@/pages/PropertyDetail";
 import MyBookings from "@/pages/MyBookings";
 import NotFound from "@/pages/not-found";
+import AddOfficeSpace from "@/pages/AddOfficeSpace";
+import MyOfficeSpaces from "@/pages/MyOfficeSpaces";
 
 function Router() {
   return (
@@ -21,6 +23,8 @@ function Router() {
       <Route path="/hotels" component={Home} />
       <Route path="/property/:id" component={PropertyDetail} />
       <Route path="/my-bookings" component={MyBookings} />
+      <Route path="/add-office-space" component={AddOfficeSpace} />
+      <Route path="/my-office-spaces" component={MyOfficeSpaces} />
       <Route component={NotFound} />
     </Switch>
   );

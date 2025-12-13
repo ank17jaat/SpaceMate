@@ -249,7 +249,7 @@ function BookingCard({
             <div>
               <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
               <p className="text-2xl font-bold" data-testid="text-booking-total">
-                ${booking.totalPrice}
+                ₹{booking.totalPrice}
               </p>
               <Badge variant="outline" className="mt-2">Pay Cash at Arrival</Badge>
             </div>

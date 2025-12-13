@@ -1,13 +1,21 @@
 import { Link, useLocation } from 'wouter';
 import { SignInButton, SignUpButton, UserButton, useAuth } from '@clerk/clerk-react';
+import { useUser } from '@/lib/clerk';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Building2, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 export function Header() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { isSignedIn } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user } = useUser();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -40,15 +48,34 @@ export function Header() {
               </Button>
             </Link> */}
             {isSignedIn && (
-              <Link href="/my-bookings">
-                <Button 
-                  variant={location === '/my-bookings' ? 'secondary' : 'ghost'}
-                  className="font-medium"
-                  data-testid="link-bookings"
-                >
-                  My Bookings
-                </Button>
-              </Link>
+              <>
+                <Link href="/my-bookings">
+                  <Button 
+                    variant={location === '/my-bookings' ? 'secondary' : 'ghost'}
+                    className="font-medium"
+                    data-testid="link-bookings"
+                  >
+                    My Bookings
+                  </Button>
+                </Link>
+                <div className="ml-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost"
+                          className="font-medium"
+                          data-testid="button-office"
+                        >
+                          Office
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onSelect={() => setLocation('/my-office-spaces')}>My Office Spaces</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setLocation('/add-office-space')}>Add Office Space</DropdownMenuItem>
+                      </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </>
             )}
           </nav>
 
@@ -88,35 +115,74 @@ export function Header() {
           <div className="md:hidden py-4 border-t">
             <nav className="flex flex-col gap-2">
               <Link href="/">
-                <Button 
-                  variant={location === '/' ? 'secondary' : 'ghost'}
-                  className="w-full justify-start font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Office Spaces
-                </Button>
-              </Link>
-              <Link href="/hotels">
-                <Button 
-                  variant={location === '/hotels' ? 'secondary' : 'ghost'}
-                  className="w-full justify-start font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Hotels
-                </Button>
+          <Button
+            variant={location === '/' ? 'secondary' : 'ghost'}
+            className="w-full justify-start font-medium"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Office Spaces
+          </Button>
               </Link>
               {isSignedIn && (
-                <Link href="/my-bookings">
-                  <Button 
-                    variant={location === '/my-bookings' ? 'secondary' : 'ghost'}
-                    className="w-full justify-start font-medium"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    My Bookings
-                  </Button>
-                </Link>
+          <>
+            <Link href="/my-bookings">
+              <Button
+                variant={location === '/my-bookings' ? 'secondary' : 'ghost'}
+                className="w-full justify-start font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                My Bookings
+              </Button>
+            </Link>
+            <Link href="/my-office-spaces">
+              <Button
+                variant={location === '/my-office-spaces' ? 'secondary' : 'ghost'}
+                className="w-full justify-start font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                My Office Spaces
+              </Button>
+            </Link>
+            <Link href="/add-office-space">
+              <Button
+                variant={location === '/add-office-space' ? 'secondary' : 'ghost'}
+                className="w-full justify-start font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Add Office Space
+              </Button>
+            </Link>
+          </>
               )}
             </nav>
+
+            <div className="mt-3 flex flex-col gap-2">
+              {!isSignedIn ? (
+          <>
+            <SignInButton mode="modal">
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Sign In
+              </Button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <Button
+                className="w-full"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Sign Up
+              </Button>
+            </SignUpButton>
+          </>
+              ) : (
+          <div className="w-full">
+            <UserButton afterSignOutUrl="/" />
+          </div>
+              )}
+            </div>
           </div>
         )}
       </div>

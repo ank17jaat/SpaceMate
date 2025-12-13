@@ -1,21 +1,68 @@
-import { useQuery } from '@tanstack/react-query';
 import { Property, SearchPropertiesParams } from '@shared/schema';
 import { Hero } from '@/components/Hero';
 import { PropertyCard } from '@/components/PropertyCard';
 import { SearchFilters } from '@/components/SearchFilters';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Briefcase } from 'lucide-react';
+
+function buildQueryString(filters: SearchPropertiesParams) {
+  const params = new URLSearchParams();
+  // ensure we request office-type properties
+  params.set('type', 'office');
+  if (filters.city) params.set('city', String(filters.city));
+  if (filters.minPrice !== undefined) params.set('minPrice', String(filters.minPrice));
+  if (filters.maxPrice !== undefined) params.set('maxPrice', String(filters.maxPrice));
+  if (filters.rating !== undefined) params.set('rating', String(filters.rating));
+  if (filters.amenities && Array.isArray(filters.amenities) && filters.amenities.length > 0) {
+    params.set('amenities', filters.amenities.join(','));
+  }
+  return params.toString();
+}
 
 export default function OfficeSpaces() {
   const [filters, setFilters] = useState<SearchPropertiesParams>({});
+  const [properties, setProperties] = useState<Property[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { data: properties, isLoading } = useQuery<Property[]>({
-    queryKey: ['/api/properties', { ...filters, type: 'office' }],
-  });
+  const fetchProperties = async (f: SearchPropertiesParams) => {
+    setIsLoading(true);
+    try {
+      const qs = buildQueryString(f);
+      const url = qs ? `/api/properties?${qs}` : `/api/properties`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      // normalize server response into shape expected by PropertyCard
+      const normalized = (data || []).map((d: any) => ({
+        id: d._id || d.id,
+        name: d.name || d.title || '',
+        description: d.description || '',
+        images: Array.isArray(d.images) ? d.images : [],
+        city: d.city || '',
+        location: d.location || '',
+        pricePerNight: d.price != null ? d.price : d.pricePerNight || 0,
+        rating: d.rating || 0,
+        amenities: d.amenities || [],
+        type: d.type || 'office',
+      })) as Property[];
+      setProperties(normalized);
+    } catch (err) {
+      console.error('Failed to fetch properties', err);
+      setProperties([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleFilterChange = (newFilters: SearchPropertiesParams) => {
     setFilters(newFilters);
+    fetchProperties(newFilters);
   };
+
+  useEffect(() => {
+    // initial load
+    fetchProperties(filters);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,17 +89,13 @@ export default function OfficeSpaces() {
         ) : properties && properties.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {properties.map((property) => (
-              <PropertyCard key={property.id} property={property} />
+              <PropertyCard key={property.id || (property as any)._id} property={property} />
             ))}
           </div>
         ) : (
           <div className="text-center py-20">
-            <p className="text-lg text-muted-foreground mb-4">
-              No office spaces found matching your criteria
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Try adjusting your filters or search for a different location
-            </p>
+            <p className="text-lg text-muted-foreground mb-4">No office spaces found</p>
+            <p className="text-sm text-muted-foreground">Try adjusting your filters or search for a different location</p>
           </div>
         )}
       </div>

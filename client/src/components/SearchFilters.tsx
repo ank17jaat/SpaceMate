@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SlidersHorizontal, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface SearchFiltersProps {
   onFilterChange: (filters: any) => void;
@@ -23,6 +23,28 @@ export function SearchFilters({ onFilterChange, propertyType }: SearchFiltersPro
   const amenities = propertyType === 'hotel' 
     ? ['WiFi', 'Parking', 'Pool', 'Gym', 'Restaurant', 'Room Service', 'Breakfast', 'Spa']
     : ['WiFi', 'Parking', 'Meeting Rooms', 'Coffee', '24/7 Access', 'Printer', 'Kitchen', 'Lounge'];
+
+  // dynamic amenities fetched from server (unique across collections). We merge with defaults above.
+  const [fetchedAmenities, setFetchedAmenities] = useState<string[]>([]);
+
+  // Fetch amenities from backend and merge with defaults
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/amenities');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!mounted) return;
+        if (Array.isArray(data?.amenities)) {
+          setFetchedAmenities(data.amenities as string[]);
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false };
+  }, []);
 
   const handleAmenityToggle = (amenity: string) => {
     setSelectedAmenities(prev => 
@@ -125,7 +147,7 @@ export function SearchFilters({ onFilterChange, propertyType }: SearchFiltersPro
             <div className="space-y-3">
               <Label>Amenities</Label>
               <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                {amenities.map((amenity) => (
+                {[...new Set([...amenities, ...fetchedAmenities])].map((amenity) => (
                   <div key={amenity} className="flex items-center gap-2">
                     <Checkbox
                       id={amenity}

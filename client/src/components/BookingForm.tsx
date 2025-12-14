@@ -48,7 +48,7 @@ export function BookingForm({ property, onBook, isPending }: BookingFormProps) {
     <Card className="p-6 sticky top-24">
       <div className="mb-4 pb-4 border-b">
         <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-3xl font-bold">${property.pricePerNight}</span>
+          <span className="text-3xl font-bold">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(property.pricePerNight)}</span>
           <span className="text-muted-foreground">
             / {property.type === 'hotel' ? 'night' : 'day'}
           </span>
@@ -114,13 +114,13 @@ export function BookingForm({ property, onBook, isPending }: BookingFormProps) {
           <div className="space-y-2 py-4 border-t border-b">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                ${property.pricePerNight} × {nights} {property.type === 'hotel' ? 'nights' : 'days'}
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(property.pricePerNight)} × {nights} {property.type === 'hotel' ? 'nights' : 'days'}
               </span>
-              <span className="font-medium">${totalPrice}</span>
+              <span className="font-medium">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalPrice)}</span>
             </div>
             <div className="flex justify-between font-semibold text-lg">
               <span>Total</span>
-              <span data-testid="text-total-price">${totalPrice}</span>
+              <span data-testid="text-total-price">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalPrice)}</span>
             </div>
           </div>
         )}

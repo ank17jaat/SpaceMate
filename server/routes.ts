@@ -8,38 +8,39 @@ export async function registerRoutes(app: Express) {
   // Get office spaces with optional filters
   app.get("/api/properties", async (req, res) => {
     try {
-      const { city, minPrice, maxPrice, rating, amenities, ownerId } = req.query as any;
+      const { city, minPrice, maxPrice, rating, amenities, ownerId, search } = req.query as any;
 
       // Build query for OfficeSpace collection
       const query: any = {};
       if (ownerId) query.ownerId = String(ownerId);
+      if (search) query.title = { $regex: String(search), $options: "i" };
       if (city) query.city = { $regex: String(city), $options: "i" };
       if (minPrice) query.price = { ...(query.price || {}), $gte: Number(minPrice) };
       if (maxPrice) query.price = { ...(query.price || {}), $lte: Number(maxPrice) };
       if (rating) query.rating = { $gte: Number(rating) };
       if (amenities) {
+        // amenities can be comma separated
         const arr = String(amenities).split(',').map((a) => a.trim()).filter(Boolean);
         if (arr.length > 0) query.amenities = { $all: arr };
       }
 
       const docs = await OfficeSpace.find(query).lean();
 
-      // Normalize documents
-      const normalized = docs.map((d: any) => ({
-        _id: d._id || d.id,
-        id: String(d._id || d.id),
-        name: d.title || d.name || '',
+      // Map documents to consistent public shape
+      const mapped = docs.map((d: any) => ({
+        id: String(d._id),
+        title: d.title || '',
         description: d.description || '',
-        images: d.images && d.images.length ? d.images : d.image ? [d.image] : [],
         city: d.city || '',
-        location: d.address || d.location || '',
-        price: d.price != null ? d.price : d.pricePerNight || 0,
-        rating: d.rating != null ? d.rating : 0,
+        address: d.address || '',
+        price: d.price ?? 0,
+        rating: d.rating ?? 0,
         amenities: d.amenities || [],
+        images: d.images?.length ? d.images : [],
         ownerId: d.ownerId || undefined,
       }));
 
-      res.json(normalized);
+      res.json(mapped);
     } catch (error) {
       console.error('Failed to fetch properties', error);
       res.status(500).json({ error: "Failed to fetch office spaces" });
@@ -53,20 +54,47 @@ export async function registerRoutes(app: Express) {
       if (!space) return res.status(404).json({ error: "Not found" });
 
       const normalized = {
-        _id: space._id,
         id: String(space._id),
-        name: space.title || space.name || '',
+        title: space.title || '',
         description: space.description || '',
-        images: space.images && space.images.length ? space.images : space.image ? [space.image] : [],
         city: space.city || '',
-        location: space.address || space.location || '',
-        price: space.price != null ? space.price : space.pricePerNight || 0,
-        rating: space.rating != null ? space.rating : 0,
+        address: space.address || '',
+        price: space.price ?? 0,
+        rating: space.rating ?? 0,
         amenities: space.amenities || [],
+        images: space.images?.length ? space.images : [],
+        ownerId: space.ownerId || undefined,
       };
+
       res.json(normalized);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch office space" });
+    }
+  });
+
+  // Delete office space
+  app.delete("/api/properties/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const doc = await OfficeSpace.findByIdAndDelete(id);
+      if (!doc) return res.status(404).json({ error: "Not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete office space error', error);
+      res.status(500).json({ error: 'Failed to delete office space' });
+    }
+  });
+
+  // Backward-compatible route: delete via /api/offices/:id
+  app.delete("/api/offices/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const doc = await OfficeSpace.findByIdAndDelete(id);
+      if (!doc) return res.status(404).json({ error: "Not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete office error', error);
+      res.status(500).json({ error: 'Failed to delete office' });
     }
   });
 
@@ -91,7 +119,19 @@ export async function registerRoutes(app: Express) {
         rating: rating != null ? Number(rating) : 0,
       });
 
-      res.status(201).json(doc);
+      const out = {
+        id: String(doc._id),
+        title: doc.title,
+        description: doc.description,
+        city: doc.city,
+        address: doc.address || '',
+        price: doc.price ?? 0,
+        rating: doc.rating ?? 0,
+        amenities: doc.amenities || [],
+        images: doc.images || [],
+        ownerId: doc.ownerId || undefined,
+      };
+      res.status(201).json(out);
     } catch (error) {
       console.error("Create office space error:", error);
       res.status(400).json({ error: "Failed to create office space" });

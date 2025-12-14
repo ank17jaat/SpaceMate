@@ -47,10 +47,9 @@ export default function PropertyDetail() {
       const localBooking = {
         id: `local-${Date.now()}`,
         ...bookingData,
-        propertyName: property!.name,
-        propertyLocation: property!.location,
+        propertyTitle: property!.title,
+        propertyAddress: property!.address,
         propertyCity: property!.city,
-        propertyType: property!.type,
         propertyImages: property!.images,
         status: 'confirmed',
         createdAt: new Date().toISOString(),
@@ -120,7 +119,7 @@ export default function PropertyDetail() {
         <div className="relative aspect-[21/9] rounded-lg overflow-hidden mb-8 group">
           <img
             src={property.images[currentImageIndex]}
-            alt={property.name}
+            alt={property.title}
             className="w-full h-full object-cover"
           />
           {property.images.length > 1 && (
@@ -164,12 +163,12 @@ export default function PropertyDetail() {
             <div>
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div>
-                  <h1 className="text-3xl sm:text-4xl font-bold mb-2" data-testid="text-property-title">
-                    {property.name}
-                  </h1>
+                          <h1 className="text-3xl sm:text-4xl font-bold mb-2" data-testid="text-property-title">
+                            {property.title}
+                          </h1>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <MapPin className="h-5 w-5" />
-                    <span className="text-lg">{property.location}, {property.city}</span>
+                            <span className="text-lg">{property.address}, {property.city}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-lg">

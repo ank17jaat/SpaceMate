@@ -1,59 +1,161 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import type { Express } from "express";
+import { createServer } from "http";
+import { OfficeSpace } from "./models/OfficeSpace";
+import { Booking } from "./models/Booking";
 
-export const properties = pgTable("properties", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  type: text("type").notNull(), // 'hotel' or 'office'
-  description: text("description").notNull(),
-  location: text("location").notNull(),
-  city: text("city").notNull(),
-  pricePerNight: integer("price_per_night").notNull(),
-  rating: integer("rating").notNull(), // 1-5 stars
-  reviewCount: integer("review_count").notNull(),
-  images: text("images").array().notNull(),
-  amenities: text("amenities").array().notNull(),
-  maxGuests: integer("max_guests").default(2),
-  maxOccupancy: integer("max_occupancy").default(2),
-  featured: boolean("featured").default(false),
-});
+export async function registerRoutes(app: Express) {
 
-export const bookings = pgTable("bookings", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  propertyId: varchar("property_id").notNull().references(() => properties.id),
-  userId: text("user_id").notNull(),
-  checkIn: timestamp("check_in").notNull(),
-  checkOut: timestamp("check_out").notNull(),
-  guests: integer("guests"),
-  totalPrice: integer("total_price").notNull(),
-  status: text("status").notNull().default('confirmed'), // 'confirmed', 'cancelled'
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+  // Get office spaces with optional filters
+  app.get("/api/properties", async (req, res) => {
+    try {
+      const { city, minPrice, maxPrice, rating, amenities, ownerId, search } = req.query as any;
 
-export const insertPropertySchema = createInsertSchema(properties).omit({
-  id: true,
-});
+      // Build query for OfficeSpace collection
+      const query: any = {};
+      if (ownerId) query.ownerId = String(ownerId);
+      if (search) query.title = { $regex: String(search), $options: "i" };
+      if (city) query.city = { $regex: String(city), $options: "i" };
+      if (minPrice) query.price = { ...(query.price || {}), $gte: Number(minPrice) };
+      if (maxPrice) query.price = { ...(query.price || {}), $lte: Number(maxPrice) };
+      if (rating) query.rating = { $gte: Number(rating) };
+      if (amenities) {
+        // amenities can be comma separated
+        const arr = String(amenities).split(',').map((a) => a.trim()).filter(Boolean);
+        if (arr.length > 0) query.amenities = { $all: arr };
+      }
 
-export const insertBookingSchema = createInsertSchema(bookings).omit({
-  id: true,
-  createdAt: true,
-});
+      const docs = await OfficeSpace.find(query).lean();
 
-export type InsertProperty = z.infer<typeof insertPropertySchema>;
-export type Property = typeof properties.$inferSelect;
-export type InsertBooking = z.infer<typeof insertBookingSchema>;
-export type Booking = typeof bookings.$inferSelect;
+      // Map documents to consistent public shape
+      const mapped = docs.map((d: any) => ({
+        id: String(d._id),
+        title: d.title || '',
+        description: d.description || '',
+        city: d.city || '',
+        address: d.address || '',
+        price: d.price ?? 0,
+        rating: d.rating ?? 0,
+        amenities: d.amenities || [],
+        images: d.images?.length ? d.images : [],
+        ownerId: d.ownerId || undefined,
+      }));
 
-// Zod schemas for API validation
-export const searchPropertiesSchema = z.object({
-  type: z.enum(['hotel', 'office', 'all']).optional(),
-  city: z.string().optional(),
-  minPrice: z.number().optional(),
-  maxPrice: z.number().optional(),
-  amenities: z.array(z.string()).optional(),
-  rating: z.number().min(1).max(5).optional(),
-});
+      res.json(mapped);
+    } catch (error) {
+      console.error('Failed to fetch properties', error);
+      res.status(500).json({ error: "Failed to fetch office spaces" });
+    }
+  });
 
-export type SearchPropertiesParams = z.infer<typeof searchPropertiesSchema>;
+  // Get one office space
+  app.get("/api/properties/:id", async (req, res) => {
+    try {
+      const space = await OfficeSpace.findById(req.params.id).lean();
+      if (!space) return res.status(404).json({ error: "Not found" });
+
+      const normalized = {
+        id: String(space._id),
+        title: space.title || '',
+        description: space.description || '',
+        city: space.city || '',
+        address: space.address || '',
+        price: space.price ?? 0,
+        rating: space.rating ?? 0,
+        amenities: space.amenities || [],
+        images: space.images?.length ? space.images : [],
+        ownerId: space.ownerId || undefined,
+      };
+
+      res.json(normalized);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch office space" });
+    }
+  });
+
+  // Create office space
+  app.post("/api/properties", async (req, res) => {
+    try {
+      const { ownerId, title, description, price, city, amenities, images, rating, address } = req.body;
+
+      if (!title || !description || price == null || !city) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const doc = await OfficeSpace.create({
+        ownerId,
+        title,
+        description,
+        price: Number(price),
+        city,
+        address,
+        amenities: Array.isArray(amenities) ? amenities : [],
+        images: Array.isArray(images) ? images : [],
+        rating: rating != null ? Number(rating) : 0,
+      });
+
+      const out = {
+        id: String(doc._id),
+        title: doc.title,
+        description: doc.description,
+        city: doc.city,
+        address: doc.address || '',
+        price: doc.price ?? 0,
+        rating: doc.rating ?? 0,
+        amenities: doc.amenities || [],
+        images: doc.images || [],
+        ownerId: doc.ownerId || undefined,
+      };
+      res.status(201).json(out);
+    } catch (error) {
+      console.error("Create office space error:", error);
+      res.status(400).json({ error: "Failed to create office space" });
+    }
+  });
+
+  // Create booking
+  app.post("/api/bookings", async (req, res) => {
+    try {
+      const booking = await Booking.create(req.body);
+      res.status(201).json(booking);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to create booking" });
+    }
+  });
+
+
+
+  // Get unique amenities
+  app.get("/api/amenities", async (_req, res) => {
+    try {
+      const docs = await OfficeSpace.find({}, { amenities: 1 }).lean();
+      const all = docs.flatMap((d: any) => d.amenities || []);
+      const unique = Array.from(new Set(all)).filter(Boolean);
+      res.json({ amenities: unique });
+    } catch (error) {
+      console.error("Failed to get amenities", error);
+      res.status(500).json({ error: "Failed to fetch amenities" });
+    }
+  });
+
+  // Get all bookings
+  app.get("/api/bookings", async (_req, res) => {
+    try {
+      const bookings = await Booking.find({});
+      res.json(bookings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch bookings" });
+    }
+  });
+
+  // Delete booking
+  app.delete("/api/bookings/:id", async (req, res) => {
+    try {
+      await Booking.findByIdAndDelete(req.params.id);
+      res.json({ message: "Booking deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete booking" });
+    }
+  });
+
+  return createServer(app);
+}

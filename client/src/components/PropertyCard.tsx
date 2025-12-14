@@ -47,7 +47,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
           <div className="relative aspect-[4/3] overflow-hidden group">
             <img 
               src={property.images[currentImageIndex]} 
-              alt={property.name}
+              alt={property.title}
               className="w-full h-full object-cover"
             />
             {property.images.length > 1 && (
@@ -97,7 +97,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
             <div>
               <div className="flex items-start justify-between gap-2 mb-1">
                 <h3 className="font-semibold text-lg line-clamp-1" data-testid="text-property-name">
-                  {property.name}
+                  {property.title}
                 </h3>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Star className="h-4 w-4 fill-primary text-primary" />
@@ -109,7 +109,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
               </div>
               <div className="flex items-center gap-1 text-muted-foreground text-sm">
                 <MapPin className="h-4 w-4" />
-                <span className="line-clamp-1">{property.location}, {property.city}</span>
+                <span className="line-clamp-1">{property.address}, {property.city}</span>
               </div>
             </div>
 
@@ -129,7 +129,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
               <div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold" data-testid="text-price">
-                    ₹{property.pricePerNight}
+                    ₹{property.price}
                   </span>
                   <span className="text-muted-foreground text-sm">
                     / {property.type === 'hotel' ? 'night' : 'day'}

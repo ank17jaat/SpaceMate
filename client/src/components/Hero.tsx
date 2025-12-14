@@ -9,15 +9,22 @@ import heroImage from '@assets/generated_images/Luxury_hotel_lobby_hero_dad4bd16
 
 export function Hero() {
   const [, setLocation] = useLocation();
-  const [searchType, setSearchType] = useState<'office' | 'hotel'>('office');
   const [searchCity, setSearchCity] = useState('');
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams();
-    if (searchCity) params.set('city', searchCity);
-    const path = searchType === 'hotel' ? '/' : '/hotels';
-    setLocation(`${path}?${params.toString()}`);
+    if (searchCity && searchCity.trim()) {
+      setLocation(`/?city=${encodeURIComponent(searchCity.trim())}`);
+    } else {
+      setLocation('/');
+    }
+
+    // notify page to scroll to filters
+    try {
+      window.dispatchEvent(new Event('scrollToFilters'));
+    } catch (e) {
+      // ignore in non-browser environments
+    }
   };
 
   return (
@@ -38,26 +45,10 @@ export function Hero() {
 
         <Card className="w-full max-w-4xl p-6 sm:p-8 bg-background/95 backdrop-blur">
           <div className="flex gap-2 mb-6">
-            <Button
-              type="button"
-              // variant={searchType === 'office' ? 'default' : 'outline'}
-              // onClick={() => setSearchType('office')}
-              className="flex-1"
-              data-testid="button-search-offices"
-            >
+            <Button type="button" className="flex-1" data-testid="button-search-offices">
               <Briefcase className="h-4 w-4 mr-2" />
               Office Spaces
             </Button>
-            {/* <Button
-              type="button"
-              variant={searchType === 'hotel' ? 'default' : 'outline'}
-              onClick={() => setSearchType('hotel')}
-              className="flex-1"
-              data-testid="button-search-hotels"
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Hotels
-            </Button> */}
           </div>
 
           <form onSubmit={handleSearch} className="space-y-4">

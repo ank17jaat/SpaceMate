@@ -10,19 +10,19 @@ import { useState, useEffect } from 'react';
 
 interface SearchFiltersProps {
   onFilterChange: (filters: any) => void;
-  propertyType: 'hotel' | 'office';
+  city?: string;
+  amenities?: string[];
 }
 
-export function SearchFilters({ onFilterChange, propertyType }: SearchFiltersProps) {
+export function SearchFilters({ onFilterChange, city: cityProp, amenities: amenitiesProp }: SearchFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [priceRange, setPriceRange] = useState([0, 1000]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [selectedRating, setSelectedRating] = useState<string>('all');
-  const [city, setCity] = useState('');
+  const [city, setCity] = useState(cityProp || '');
+  const [search, setSearch] = useState('');
 
-  const amenities = propertyType === 'hotel' 
-    ? ['WiFi', 'Parking', 'Pool', 'Gym', 'Restaurant', 'Room Service', 'Breakfast', 'Spa']
-    : ['WiFi', 'Parking', 'Meeting Rooms', 'Coffee', '24/7 Access', 'Printer', 'Kitchen', 'Lounge'];
+  const amenities = ['WiFi', 'Parking', 'Meeting Rooms', 'Coffee', '24/7 Access', 'Printer', 'Kitchen', 'Lounge'];
 
   // dynamic amenities fetched from server (unique across collections). We merge with defaults above.
   const [fetchedAmenities, setFetchedAmenities] = useState<string[]>([]);
@@ -46,12 +46,36 @@ export function SearchFilters({ onFilterChange, propertyType }: SearchFiltersPro
     return () => { mounted = false };
   }, []);
 
+  // If parent supplies a city (via URL from Hero), update local city input value
+  useEffect(() => {
+    if (typeof cityProp !== 'undefined') {
+      setCity(cityProp || '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityProp]);
+
+  // initialize selected amenities from parent (URL) - normalize to lowercase
+  useEffect(() => {
+    if (Array.isArray(amenitiesProp)) {
+      setSelectedAmenities(amenitiesProp.map(a => String(a).toLowerCase()));
+    }
+  }, [amenitiesProp]);
+
   const handleAmenityToggle = (amenity: string) => {
-    setSelectedAmenities(prev => 
-      prev.includes(amenity) 
-        ? prev.filter(a => a !== amenity)
-        : [...prev, amenity]
-    );
+    const lower = amenity.toLowerCase();
+    setSelectedAmenities(prev => {
+      const updated = prev.includes(lower) ? prev.filter(a => a !== lower) : [...prev, lower];
+      // notify parent with full filter set using lowercase amenities array
+      onFilterChange({
+        city: city || undefined,
+        minPrice: priceRange[0],
+        maxPrice: priceRange[1],
+        amenities: updated,
+        rating: selectedRating !== 'all' ? parseInt(selectedRating) : undefined,
+        search: search || undefined,
+      });
+      return updated;
+    });
   };
 
   const applyFilters = () => {
@@ -59,8 +83,9 @@ export function SearchFilters({ onFilterChange, propertyType }: SearchFiltersPro
       city: city || undefined,
       minPrice: priceRange[0],
       maxPrice: priceRange[1],
-      amenities: selectedAmenities.length > 0 ? selectedAmenities : undefined,
+      amenities: selectedAmenities.length > 0 ? selectedAmenities : [],
       rating: selectedRating !== 'all' ? parseInt(selectedRating) : undefined,
+      search: search || undefined,
     });
     setIsOpen(false);
   };
@@ -107,6 +132,16 @@ export function SearchFilters({ onFilterChange, propertyType }: SearchFiltersPro
         <Card className="p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="space-y-3">
+              <Label>Search</Label>
+              <Input
+                placeholder="Search title"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="input-filter-search"
+              />
+            </div>
+
+            <div className="space-y-3">
               <Label>City</Label>
               <Input
                 placeholder="Enter city"
@@ -151,7 +186,7 @@ export function SearchFilters({ onFilterChange, propertyType }: SearchFiltersPro
                   <div key={amenity} className="flex items-center gap-2">
                     <Checkbox
                       id={amenity}
-                      checked={selectedAmenities.includes(amenity)}
+                      checked={selectedAmenities.includes(amenity.toLowerCase())}
                       onCheckedChange={() => handleAmenityToggle(amenity)}
                       data-testid={`checkbox-amenity-${amenity}`}
                     />

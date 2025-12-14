@@ -17,9 +17,9 @@ import MyOfficeSpaces from "@/pages/MyOfficeSpaces";
 function Router() {
   return (
     <Switch>
-      {/* <Route path="/" component={Home} />
-      <Route path="/office-spaces" component={OfficeSpaces} /> */}
+      {/* keep both root and explicit office-spaces routes */}
       <Route path="/" component={OfficeSpaces} />
+      <Route path="/office-spaces" component={OfficeSpaces} />
       <Route path="/hotels" component={Home} />
       <Route path="/property/:id" component={PropertyDetail} />
       <Route path="/my-bookings" component={MyBookings} />

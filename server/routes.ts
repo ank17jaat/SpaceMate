@@ -2,8 +2,11 @@ import type { Express } from "express";
 import { createServer } from "http";
 import { OfficeSpace } from "./models/OfficeSpace";
 import { Booking } from "./models/Booking";
+import { initializeEmailService, sendBookingEmail } from "./utils/email";
 
 export async function registerRoutes(app: Express) {
+  // Initialize email service on startup
+  initializeEmailService();
 
   // Get office spaces with optional filters
   app.get("/api/properties", async (req, res) => {
@@ -141,9 +144,21 @@ export async function registerRoutes(app: Express) {
   // Create booking
   app.post("/api/bookings", async (req, res) => {
     try {
+      // Save booking to MongoDB
       const booking = await Booking.create(req.body);
-      res.status(201).json(booking);
+
+      // Send Email Notification (non-blocking, errors logged but don't fail the API response)
+      try {
+        if (req.body.userEmail || req.body.email) {
+          await sendBookingEmail(req.body);
+        }
+      } catch (emailError) {
+        console.error('⚠️ Email notification failed (booking still created):', emailError);
+      }
+
+      res.status(201).json({ success: true, booking });
     } catch (error) {
+      console.error("Booking Error:", error);
       res.status(400).json({ error: "Failed to create booking" });
     }
   });

@@ -2,8 +2,13 @@ import mongoose from "mongoose";
 
 export const connectDB = async () => {
   try {
-    console.log("Loaded MONGO_URI:", process.env.MONGO_URI);
-    await mongoose.connect(process.env.MONGO_URI as string);
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+
+    if (!mongoUri) {
+      throw new Error("Missing MONGO_URI or MONGODB_URI environment variable");
+    }
+
+    await mongoose.connect(mongoUri);
     console.log("MongoDB Connected");
   } catch (error) {
     console.error("MongoDB Error:", error);

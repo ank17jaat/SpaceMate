@@ -1,63 +1,52 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useAuth } from '@clerk/clerk-react';
 import { Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { bookingsApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 interface ReserveCashButtonProps {
   workspaceId: string;
-  userId: string;
-  bookingDate: string; // ISO date or display string
-  timeSlot?: string; // optional time slot
+  bookingDate: string;
+  timeSlot?: string;
   fullDay?: boolean;
 }
 
-export default function ReserveCashButton({ workspaceId, userId, bookingDate, timeSlot, fullDay }: ReserveCashButtonProps) {
+export default function ReserveCashButton({ workspaceId, bookingDate }: ReserveCashButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { getToken } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const handleReserve = async () => {
     setIsLoading(true);
     try {
-      const payload: any = {
-        workspaceId,
-        userId,
-        bookingDate,
-        paymentMethod: 'cash',
-        paymentStatus: 'pending',
-        createdAt: new Date().toISOString(),
-      };
+      const checkIn = new Date(bookingDate).toISOString();
+      const checkOut = new Date(
+        new Date(bookingDate).getTime() + 24 * 60 * 60 * 1000,
+      ).toISOString();
 
-      if (fullDay) payload.fullDay = true;
-      if (timeSlot) payload.timeSlot = timeSlot;
+      await bookingsApi.create(
+        {
+          propertyId: workspaceId,
+          checkIn,
+          checkOut,
+          guests: 1,
+        },
+        getToken,
+      );
 
-      const res = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
+      toast({
+        title: 'Booking created',
+        description: 'Your reservation is confirmed. Pay cash on arrival.',
       });
-
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || 'Failed to create booking');
-      }
-
-      const booking = await res.json();
-
-      toast({ title: 'Booking created', description: 'Your reservation is confirmed. Pay cash on arrival.' });
-
-      const id = booking.id || booking._id || booking._id?.toString();
-      if (id) {
-        setLocation(`/booking-confirmation/${id}`);
-      } else {
-        // fallback: navigate to bookings list
-        setLocation('/my-bookings');
-      }
+      setLocation('/my-bookings');
     } catch (err: any) {
-      console.error('Reserve failed', err);
-      toast({ title: 'Booking failed', description: err?.message || 'Unable to create booking' });
+      toast({
+        title: 'Booking failed',
+        description: err?.message || 'Unable to create booking',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +55,7 @@ export default function ReserveCashButton({ workspaceId, userId, bookingDate, ti
   return (
     <Button onClick={handleReserve} disabled={isLoading} data-testid="button-reserve-cash">
       {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-      Reserve — Pay Cash on Arrival
+      Reserve - Pay Cash on Arrival
     </Button>
   );
 }

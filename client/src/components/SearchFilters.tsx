@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SlidersHorizontal, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { metaApi } from '@/lib/api';
 
 interface SearchFiltersProps {
   onFilterChange: (filters: any) => void;
   city?: string;
   amenities?: string[];
+  propertyType?: 'office' | 'hotel';
 }
 
 export function SearchFilters({ onFilterChange, city: cityProp, amenities: amenitiesProp }: SearchFiltersProps) {
@@ -32,9 +34,7 @@ export function SearchFilters({ onFilterChange, city: cityProp, amenities: ameni
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch('/api/amenities');
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await metaApi.listAmenities();
         if (!mounted) return;
         if (Array.isArray(data?.amenities)) {
           setFetchedAmenities(data.amenities as string[]);

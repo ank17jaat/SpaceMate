@@ -1,15 +1,21 @@
 import dotenv from "dotenv";
 dotenv.config();
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { connectDB } from "./database/connect"; // <-- Added for MongoDB
 
+import fs from "fs";
+import path from "path";
+import { createServer } from "http";
+import express from "express";
+import helmet from "helmet";
+import { connectDB } from "./database/connect";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { apiRateLimiter } from "./middleware/rateLimiter";
+import { requestLogger } from "./middleware/requestLogger";
+import { registerRoutes } from "./routes";
+import { log } from "./log";
+import { strictCors } from "./utils/cors";
 
 const app = express();
-
-// Connect to MongoDB Atlas
-connectDB();  // <-- Added
+app.set("trust proxy", 1);
 
 declare module "http" {
   interface IncomingMessage {
@@ -17,75 +23,41 @@ declare module "http" {
   }
 }
 
+connectDB();
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
-  })
+  }),
 );
-
 app.use(express.urlencoded({ extended: false }));
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(strictCors);
+app.use(apiRateLimiter);
+app.use(requestLogger);
 
-// Logging API responses
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+registerRoutes(app);
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+const server = createServer(app);
 
 (async () => {
-  const server = await registerRoutes(app);
-
-  // Global error handler
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // Setup Vite in development
   if (app.get("env") === "development") {
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
-  } else {
+  } else if (
+    fs.existsSync(path.resolve(import.meta.dirname, "public", "index.html"))
+  ) {
+    const { serveStatic } = await import("./vite");
     serveStatic(app);
   }
 
-  // Run server on allowed port
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
   const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen(
-    {
-      port,
-      host: "0.0.0.0",
-    },
-    () => {
-      log(`serving on port ${port}`);
-    }
-  );
+  server.listen({ port, host: "0.0.0.0" }, () => {
+    log(`serving on port ${port}`);
+  });
 })();

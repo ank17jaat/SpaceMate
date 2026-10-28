@@ -1,161 +1,83 @@
-import type { Express } from "express";
-import { createServer } from "http";
-import { OfficeSpace } from "./models/OfficeSpace";
-import { Booking } from "./models/Booking";
+import { z } from "zod";
 
-export async function registerRoutes(app: Express) {
+export const propertyTypeSchema = z.enum(["office", "hotel"]);
+export type PropertyType = z.infer<typeof propertyTypeSchema>;
 
-  // Get office spaces with optional filters
-  app.get("/api/properties", async (req, res) => {
-    try {
-      const { city, minPrice, maxPrice, rating, amenities, ownerId, search } = req.query as any;
+export const propertySchema = z.object({
+  id: z.string(),
+  ownerId: z.string().optional(),
+  title: z.string(),
+  description: z.string(),
+  city: z.string(),
+  address: z.string(),
+  price: z.number().nonnegative(),
+  rating: z.number().nonnegative(),
+  reviewCount: z.number().int().nonnegative(),
+  amenities: z.array(z.string()),
+  images: z.array(z.string().url()).default([]),
+  type: propertyTypeSchema,
+  maxGuests: z.number().int().positive().default(1),
+  createdAt: z.string().optional(),
+});
+export type Property = z.infer<typeof propertySchema>;
 
-      // Build query for OfficeSpace collection
-      const query: any = {};
-      if (ownerId) query.ownerId = String(ownerId);
-      if (search) query.title = { $regex: String(search), $options: "i" };
-      if (city) query.city = { $regex: String(city), $options: "i" };
-      if (minPrice) query.price = { ...(query.price || {}), $gte: Number(minPrice) };
-      if (maxPrice) query.price = { ...(query.price || {}), $lte: Number(maxPrice) };
-      if (rating) query.rating = { $gte: Number(rating) };
-      if (amenities) {
-        // amenities can be comma separated
-        const arr = String(amenities).split(',').map((a) => a.trim()).filter(Boolean);
-        if (arr.length > 0) query.amenities = { $all: arr };
-      }
+export const searchPropertiesParamsSchema = z.object({
+  city: z.string().trim().min(1).optional(),
+  search: z.string().trim().min(1).optional(),
+  minPrice: z.number().nonnegative().optional(),
+  maxPrice: z.number().nonnegative().optional(),
+  rating: z.number().min(0).max(5).optional(),
+  amenities: z.union([z.array(z.string()), z.string()]).optional(),
+  type: propertyTypeSchema.optional(),
+});
+export type SearchPropertiesParams = z.infer<typeof searchPropertiesParamsSchema>;
 
-      const docs = await OfficeSpace.find(query).lean();
+export const createPropertyInputSchema = z.object({
+  title: z.string().trim().min(3).max(120),
+  description: z.string().trim().min(10).max(5000),
+  city: z.string().trim().min(2).max(120),
+  address: z.string().trim().min(2).max(240),
+  price: z.number().nonnegative().max(1_000_000),
+  amenities: z.array(z.string().trim().min(1).max(50)).max(50).default([]),
+  images: z.array(z.string().url()).max(20).default([]),
+  type: propertyTypeSchema.default("office"),
+  maxGuests: z.number().int().positive().max(100).default(1),
+});
+export type CreatePropertyInput = z.infer<typeof createPropertyInputSchema>;
 
-      // Map documents to consistent public shape
-      const mapped = docs.map((d: any) => ({
-        id: String(d._id),
-        title: d.title || '',
-        description: d.description || '',
-        city: d.city || '',
-        address: d.address || '',
-        price: d.price ?? 0,
-        rating: d.rating ?? 0,
-        amenities: d.amenities || [],
-        images: d.images?.length ? d.images : [],
-        ownerId: d.ownerId || undefined,
-      }));
+export const createBookingInputSchema = z.object({
+  propertyId: z.string().trim().min(1),
+  checkIn: z.string().datetime(),
+  checkOut: z.string().datetime(),
+  guests: z.number().int().positive().max(100),
+});
+export type CreateBookingInput = z.infer<typeof createBookingInputSchema>;
 
-      res.json(mapped);
-    } catch (error) {
-      console.error('Failed to fetch properties', error);
-      res.status(500).json({ error: "Failed to fetch office spaces" });
-    }
-  });
+export const bookingStatusSchema = z.enum(["confirmed", "cancelled"]);
+export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 
-  // Get one office space
-  app.get("/api/properties/:id", async (req, res) => {
-    try {
-      const space = await OfficeSpace.findById(req.params.id).lean();
-      if (!space) return res.status(404).json({ error: "Not found" });
+export const bookingPropertySummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  location: z.string(),
+  city: z.string(),
+  type: propertyTypeSchema,
+  images: z.array(z.string().url()).default([]),
+});
+export type BookingPropertySummary = z.infer<typeof bookingPropertySummarySchema>;
 
-      const normalized = {
-        id: String(space._id),
-        title: space.title || '',
-        description: space.description || '',
-        city: space.city || '',
-        address: space.address || '',
-        price: space.price ?? 0,
-        rating: space.rating ?? 0,
-        amenities: space.amenities || [],
-        images: space.images?.length ? space.images : [],
-        ownerId: space.ownerId || undefined,
-      };
-
-      res.json(normalized);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch office space" });
-    }
-  });
-
-  // Create office space
-  app.post("/api/properties", async (req, res) => {
-    try {
-      const { ownerId, title, description, price, city, amenities, images, rating, address } = req.body;
-
-      if (!title || !description || price == null || !city) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-
-      const doc = await OfficeSpace.create({
-        ownerId,
-        title,
-        description,
-        price: Number(price),
-        city,
-        address,
-        amenities: Array.isArray(amenities) ? amenities : [],
-        images: Array.isArray(images) ? images : [],
-        rating: rating != null ? Number(rating) : 0,
-      });
-
-      const out = {
-        id: String(doc._id),
-        title: doc.title,
-        description: doc.description,
-        city: doc.city,
-        address: doc.address || '',
-        price: doc.price ?? 0,
-        rating: doc.rating ?? 0,
-        amenities: doc.amenities || [],
-        images: doc.images || [],
-        ownerId: doc.ownerId || undefined,
-      };
-      res.status(201).json(out);
-    } catch (error) {
-      console.error("Create office space error:", error);
-      res.status(400).json({ error: "Failed to create office space" });
-    }
-  });
-
-  // Create booking
-  app.post("/api/bookings", async (req, res) => {
-    try {
-      const booking = await Booking.create(req.body);
-      res.status(201).json(booking);
-    } catch (error) {
-      res.status(400).json({ error: "Failed to create booking" });
-    }
-  });
-
-
-
-  // Get unique amenities
-  app.get("/api/amenities", async (_req, res) => {
-    try {
-      const docs = await OfficeSpace.find({}, { amenities: 1 }).lean();
-      const all = docs.flatMap((d: any) => d.amenities || []);
-      const unique = Array.from(new Set(all)).filter(Boolean);
-      res.json({ amenities: unique });
-    } catch (error) {
-      console.error("Failed to get amenities", error);
-      res.status(500).json({ error: "Failed to fetch amenities" });
-    }
-  });
-
-  // Get all bookings
-  app.get("/api/bookings", async (_req, res) => {
-    try {
-      const bookings = await Booking.find({});
-      res.json(bookings);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch bookings" });
-    }
-  });
-
-  // Delete booking
-  app.delete("/api/bookings/:id", async (req, res) => {
-    try {
-      await Booking.findByIdAndDelete(req.params.id);
-      res.json({ message: "Booking deleted" });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete booking" });
-    }
-  });
-
-  return createServer(app);
-}
+export const bookingSchema = z.object({
+  id: z.string(),
+  propertyId: z.string(),
+  userId: z.string(),
+  userEmail: z.string().email(),
+  checkIn: z.string().datetime(),
+  checkOut: z.string().datetime(),
+  guests: z.number().int().positive(),
+  totalPrice: z.number().nonnegative(),
+  status: bookingStatusSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  property: bookingPropertySummarySchema,
+});
+export type Booking = z.infer<typeof bookingSchema>;

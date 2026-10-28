@@ -1,91 +1,70 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useRoute, useLocation } from 'wouter';
-import { Property } from '@shared/schema';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-react';
+import { useState } from 'react';
+import { useLocation, useRoute } from 'wouter';
+import { CreateBookingInput, Property } from '@shared/schema';
+import {
+  Car,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Coffee,
+  Dumbbell,
+  Loader2,
+  MapPin,
+  Star,
+  Users,
+  Utensils,
+  Wifi,
+} from 'lucide-react';
+import { bookingsApi, propertiesApi } from '@/lib/api';
+import { queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import { BookingForm } from '@/components/BookingForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Star, MapPin, Wifi, Car, Coffee, Utensils, Dumbbell, Users, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
-import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { useAuth } from '@clerk/clerk-react';
-import { useUser } from "@clerk/clerk-react";     // <- ADDED
-
 
 const amenityIcons: Record<string, any> = {
-  'WiFi': Wifi,
-  'Parking': Car,
-  'Breakfast': Utensils,
-  'Coffee': Coffee,
-  'Gym': Dumbbell,
+  WiFi: Wifi,
+  Parking: Car,
+  Breakfast: Utensils,
+  Coffee: Coffee,
+  Gym: Dumbbell,
   'Meeting Rooms': Users,
-  'Pool': Users,
-  'Restaurant': Utensils,
+  Pool: Users,
+  Restaurant: Utensils,
   'Room Service': Utensils,
-  'Spa': Users,
+  Spa: Users,
   '24/7 Access': CheckCircle2,
-  'Printer': Users,
-  'Kitchen': Utensils,
-  'Lounge': Users,
+  Printer: Users,
+  Kitchen: Utensils,
+  Lounge: Users,
 };
 
 export default function PropertyDetail() {
   const [, params] = useRoute('/property/:id');
   const [, setLocation] = useLocation();
-  const { userId } = useAuth();
-
-  // ✅ Get user email from Clerk
-  const { user } = useUser();
-  const email = user?.primaryEmailAddress?.emailAddress || null;
-
+  const { getToken } = useAuth();
   const { toast } = useToast();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const { data: property, isLoading } = useQuery<Property>({
-    queryKey: [`/api/properties/${params?.id}`],
+    queryKey: ['property', params?.id],
+    queryFn: () => propertiesApi.getById(params!.id),
     enabled: !!params?.id,
   });
 
-  // ============================
-  // ✨ BOOKING MUTATION UPDATED
-  // ============================
-
   const bookingMutation = useMutation({
-    mutationFn: async (bookingData: any) => {
-      const localBooking = {
-        id: `local-${Date.now()}`,
-        ...bookingData,
-        propertyTitle: property!.title,
-        propertyAddress: property!.address,
-        propertyCity: property!.city,
-        propertyImages: property!.images,
-        status: 'confirmed',
-        createdAt: new Date().toISOString(),
-      };
-
-      const savedBookings = JSON.parse(localStorage.getItem('stayu_bookings') || '[]');
-      savedBookings.push(localBooking);
-      localStorage.setItem('stayu_bookings', JSON.stringify(savedBookings));
-
-      // 📩 SEND EMAIL + SAVE BOOKING IN DB
-      return apiRequest('POST', '/api/bookings', {
-        ...bookingData,
-        userEmail: email,   // <-- IMPORTANT ADDITION
-      });
-    },
-
+    mutationFn: async (bookingData: CreateBookingInput) => bookingsApi.create(bookingData, getToken),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
       toast({
         title: 'Booking Confirmed!',
         description: 'Your reservation has been confirmed. Check your email.',
       });
-      setLocation('/my-bookings' as any);
+      setLocation('/my-bookings');
     },
-
     onError: () => {
       toast({
         title: 'Booking Failed',
@@ -94,10 +73,6 @@ export default function PropertyDetail() {
       });
     },
   });
-
-  // ============================
-  // UI (unchanged)
-  // ============================
 
   if (isLoading) {
     return (
@@ -127,23 +102,13 @@ export default function PropertyDetail() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        <Button
-          variant="ghost"
-          onClick={() => setLocation(-1)}
-          className="mb-6"
-        >
+        <Button variant="ghost" onClick={() => window.history.back()} className="mb-6">
           <ChevronLeft className="h-4 w-4 mr-1" />
           Back
         </Button>
 
-        {/* IMAGE SECTION */}
         <div className="relative aspect-[21/9] rounded-lg overflow-hidden mb-8 group">
-          <img
-            src={property.images[currentImageIndex]}
-            alt={property.title}
-            className="w-full h-full object-cover"
-          />
+          <img src={property.images[currentImageIndex]} alt={property.title} className="w-full h-full object-cover" />
           {property.images.length > 1 && (
             <>
               <Button
@@ -167,9 +132,7 @@ export default function PropertyDetail() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
           <div className="lg:col-span-2 space-y-6">
-
             <div className="flex items-start justify-between">
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold">{property.title}</h1>
@@ -211,25 +174,15 @@ export default function PropertyDetail() {
                 );
               })}
             </div>
-
           </div>
 
           <div>
             <BookingForm
-  property={property}
-  onBook={(data) =>
-    bookingMutation.mutate({
-      ...data,
-      propertyTitle: property.title,
-      propertyCity: property.city,        // ✅ ONLY CITY
-      date: new Date().toISOString(),     // ✅ CURRENT DATE
-      totalPrice: data.totalPrice ?? 0,
-    })
-  }
-  isPending={bookingMutation.isPending}
-/>
+              property={property}
+              onBook={(data) => bookingMutation.mutate(data)}
+              isPending={bookingMutation.isPending}
+            />
           </div>
-
         </div>
       </div>
     </div>

@@ -1,18 +1,17 @@
 import { useState } from 'react';
-import { useAuth } from '@clerk/clerk-react';
-import { SignInButton } from '@clerk/clerk-react';
+import { useAuth, SignInButton } from '@clerk/clerk-react';
+import { differenceInDays } from 'date-fns';
+import { Calendar, Users, Banknote } from 'lucide-react';
+import { CreateBookingInput, Property } from '@shared/schema';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, Banknote } from 'lucide-react';
-import { Property } from '@shared/schema';
-import { format, differenceInDays } from 'date-fns';
 
 interface BookingFormProps {
   property: Property;
-  onBook: (bookingData: any) => void;
+  onBook: (bookingData: CreateBookingInput) => void;
   isPending?: boolean;
 }
 
@@ -24,12 +23,9 @@ export function BookingForm({ property, onBook, isPending }: BookingFormProps) {
 
   const today = new Date().toISOString().split('T')[0];
   const minCheckOut = checkIn || today;
-
-  const nights = checkIn && checkOut 
-    ? differenceInDays(new Date(checkOut), new Date(checkIn))
-    : 0;
-  
-  const totalPrice = nights > 0 ? nights * property.pricePerNight : 0;
+  const nights =
+    checkIn && checkOut ? differenceInDays(new Date(checkOut), new Date(checkIn)) : 0;
+  const totalPrice = nights > 0 ? nights * property.price : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +33,9 @@ export function BookingForm({ property, onBook, isPending }: BookingFormProps) {
 
     onBook({
       propertyId: property.id,
-      checkIn: new Date(checkIn),
-      checkOut: new Date(checkOut),
+      checkIn: new Date(checkIn).toISOString(),
+      checkOut: new Date(checkOut).toISOString(),
       guests,
-      totalPrice,
     });
   };
 
@@ -48,7 +43,13 @@ export function BookingForm({ property, onBook, isPending }: BookingFormProps) {
     <Card className="p-6 sticky top-24">
       <div className="mb-4 pb-4 border-b">
         <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-3xl font-bold">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(property.pricePerNight)}</span>
+          <span className="text-3xl font-bold">
+            {new Intl.NumberFormat('en-IN', {
+              style: 'currency',
+              currency: 'INR',
+              maximumFractionDigits: 0,
+            }).format(property.price)}
+          </span>
           <span className="text-muted-foreground">
             / {property.type === 'hotel' ? 'night' : 'day'}
           </span>
@@ -102,9 +103,9 @@ export function BookingForm({ property, onBook, isPending }: BookingFormProps) {
             id="guests"
             type="number"
             min={1}
-            max={property.maxGuests || property.maxOccupancy || 10}
+            max={property.maxGuests || 10}
             value={guests}
-            onChange={(e) => setGuests(parseInt(e.target.value))}
+            onChange={(e) => setGuests(parseInt(e.target.value, 10))}
             required
             data-testid="input-guests"
           />
@@ -114,21 +115,38 @@ export function BookingForm({ property, onBook, isPending }: BookingFormProps) {
           <div className="space-y-2 py-4 border-t border-b">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(property.pricePerNight)} × {nights} {property.type === 'hotel' ? 'nights' : 'days'}
+                {new Intl.NumberFormat('en-IN', {
+                  style: 'currency',
+                  currency: 'INR',
+                  maximumFractionDigits: 0,
+                }).format(property.price)} x {nights}{' '}
+                {property.type === 'hotel' ? 'nights' : 'days'}
               </span>
-              <span className="font-medium">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalPrice)}</span>
+              <span className="font-medium">
+                {new Intl.NumberFormat('en-IN', {
+                  style: 'currency',
+                  currency: 'INR',
+                  maximumFractionDigits: 0,
+                }).format(totalPrice)}
+              </span>
             </div>
             <div className="flex justify-between font-semibold text-lg">
               <span>Total</span>
-              <span data-testid="text-total-price">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalPrice)}</span>
+              <span data-testid="text-total-price">
+                {new Intl.NumberFormat('en-IN', {
+                  style: 'currency',
+                  currency: 'INR',
+                  maximumFractionDigits: 0,
+                }).format(totalPrice)}
+              </span>
             </div>
           </div>
         )}
 
         {isSignedIn ? (
-          <Button 
-            type="submit" 
-            className="w-full" 
+          <Button
+            type="submit"
+            className="w-full"
             size="lg"
             disabled={isPending || !checkIn || !checkOut || nights <= 0}
             data-testid="button-reserve"
@@ -143,21 +161,6 @@ export function BookingForm({ property, onBook, isPending }: BookingFormProps) {
           </SignInButton>
         )}
       </form>
-
-      <div className="mt-4 pt-4 border-t space-y-2 text-sm text-muted-foreground">
-        <p className="flex items-start gap-2">
-          <span className="text-primary">✓</span>
-          Free cancellation up to 24 hours before check-in
-        </p>
-        <p className="flex items-start gap-2">
-          <span className="text-primary">✓</span>
-          Pay in cash at the property upon arrival
-        </p>
-        <p className="flex items-start gap-2">
-          <span className="text-primary">✓</span>
-          Instant booking confirmation
-        </p>
-      </div>
     </Card>
   );
 }

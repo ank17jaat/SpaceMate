@@ -1,16 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { Property, SearchPropertiesParams } from '@shared/schema';
-// import { Hero } from '@/components/Hero';
+import { Hero } from '@/components/Hero';
 import { PropertyCard } from '@/components/PropertyCard';
 import { SearchFilters } from '@/components/SearchFilters';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { propertiesApi } from '@/lib/api';
 
 export default function Home() {
   const [filters, setFilters] = useState<SearchPropertiesParams>({});
 
   const { data: properties, isLoading } = useQuery<Property[]>({
-    queryKey: ['/api/properties', { ...filters, type: 'hotel' }],
+    queryKey: ['properties', filters],
+    queryFn: () => propertiesApi.list({ ...filters, type: 'hotel' }),
   });
 
   const handleFilterChange = (newFilters: SearchPropertiesParams) => {

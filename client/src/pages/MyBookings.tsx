@@ -1,73 +1,31 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
+import { format } from 'date-fns';
+import { Calendar, CalendarX, Loader2, MapPin, Users } from 'lucide-react';
+import { Link } from 'wouter';
+import { Booking } from '@shared/schema';
+import { bookingsApi } from '@/lib/api';
+import { queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, MapPin, Users, Loader2, CalendarX } from 'lucide-react';
-import { format } from 'date-fns';
-import { Link } from 'wouter';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
-import { getLocalBookings, updateLocalBooking, mergeBookings } from '@/lib/localStorage';
-
-interface BookingWithProperty {
-  id: string;
-  propertyId: string;
-  userId: string;
-  checkIn: string;
-  checkOut: string;
-  guests: number;
-  totalPrice: number;
-  status: string;
-  createdAt: string;
-  property: {
-    id: string;
-    name: string;
-    location: string;
-    city: string;
-    type: string;
-    images: string[];
-  };
-}
 
 export default function MyBookings() {
-  const { userId } = useAuth();
+  const { userId, getToken } = useAuth();
   const { toast } = useToast();
 
-  const { data: serverBookings, isLoading } = useQuery<BookingWithProperty[]>({
-    queryKey: ['/api/bookings'],
+  const { data: bookings = [], isLoading } = useQuery<Booking[]>({
+    queryKey: ['my-bookings', userId],
+    queryFn: () => bookingsApi.listMine(getToken),
     enabled: !!userId,
   });
 
-  const localBookings = getLocalBookings();
-  const bookings = serverBookings ? mergeBookings(serverBookings, localBookings) : localBookings.map(lb => ({
-    id: lb.id,
-    propertyId: lb.propertyId,
-    userId: userId || '',
-    checkIn: lb.checkIn,
-    checkOut: lb.checkOut,
-    guests: lb.guests,
-    totalPrice: lb.totalPrice,
-    status: lb.status,
-    createdAt: lb.createdAt,
-    property: {
-      id: lb.propertyId,
-      name: lb.propertyName,
-      location: lb.propertyLocation,
-      city: lb.propertyCity,
-      type: lb.propertyType,
-      images: lb.propertyImages,
-    },
-  }));
-
   const cancelMutation = useMutation({
-    mutationFn: async (bookingId: string) => {
-      updateLocalBooking(bookingId, { status: 'cancelled' });
-      return apiRequest('DELETE', `/api/bookings/${bookingId}`, {});
-    },
+    mutationFn: async (bookingId: string) => bookingsApi.cancel(bookingId, getToken),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bookings', userId] });
       toast({
         title: 'Booking Cancelled',
         description: 'Your booking has been successfully cancelled.',
@@ -90,15 +48,13 @@ export default function MyBookings() {
     );
   }
 
-  const upcomingBookings = bookings?.filter(b => 
-    b.status === 'confirmed' && new Date(b.checkIn) >= new Date()
-  ) || [];
-  
-  const pastBookings = bookings?.filter(b => 
-    b.status === 'confirmed' && new Date(b.checkIn) < new Date()
-  ) || [];
-
-  const cancelledBookings = bookings?.filter(b => b.status === 'cancelled') || [];
+  const upcomingBookings = bookings.filter(
+    (booking) => booking.status === 'confirmed' && new Date(booking.checkIn) >= new Date(),
+  );
+  const pastBookings = bookings.filter(
+    (booking) => booking.status === 'confirmed' && new Date(booking.checkIn) < new Date(),
+  );
+  const cancelledBookings = bookings.filter((booking) => booking.status === 'cancelled');
 
   return (
     <div className="min-h-screen bg-background">
@@ -112,7 +68,7 @@ export default function MyBookings() {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {bookings && bookings.length === 0 ? (
+        {bookings.length === 0 ? (
           <Card className="p-12 text-center">
             <CalendarX className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-2xl font-semibold mb-2">No bookings yet</h2>
@@ -130,9 +86,9 @@ export default function MyBookings() {
                 <h2 className="text-2xl font-bold mb-6">Upcoming Bookings</h2>
                 <div className="grid gap-6">
                   {upcomingBookings.map((booking) => (
-                    <BookingCard 
-                      key={booking.id} 
-                      booking={booking} 
+                    <BookingCard
+                      key={booking.id}
+                      booking={booking}
                       onCancel={cancelMutation.mutate}
                       isPending={cancelMutation.isPending}
                     />
@@ -169,14 +125,14 @@ export default function MyBookings() {
   );
 }
 
-function BookingCard({ 
-  booking, 
-  onCancel, 
+function BookingCard({
+  booking,
+  onCancel,
   isPending,
   isPast = false,
-  isCancelled = false
-}: { 
-  booking: BookingWithProperty;
+  isCancelled = false,
+}: {
+  booking: Booking;
   onCancel?: (id: string) => void;
   isPending?: boolean;
   isPast?: boolean;
@@ -220,18 +176,14 @@ function BookingCard({
               <Calendar className="h-5 w-5 text-primary mt-0.5" />
               <div>
                 <p className="font-semibold">Check-in</p>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(booking.checkIn), 'MMM dd, yyyy')}
-                </p>
+                <p className="text-sm text-muted-foreground">{format(new Date(booking.checkIn), 'MMM dd, yyyy')}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <Calendar className="h-5 w-5 text-primary mt-0.5" />
               <div>
                 <p className="font-semibold">Check-out</p>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(booking.checkOut), 'MMM dd, yyyy')}
-                </p>
+                <p className="text-sm text-muted-foreground">{format(new Date(booking.checkOut), 'MMM dd, yyyy')}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -249,7 +201,7 @@ function BookingCard({
             <div>
               <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
               <p className="text-2xl font-bold" data-testid="text-booking-total">
-                ₹{booking.totalPrice}
+                INR {booking.totalPrice}
               </p>
               <Badge variant="outline" className="mt-2">Pay Cash at Arrival</Badge>
             </div>

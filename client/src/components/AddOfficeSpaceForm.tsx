@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { useUser } from "@/lib/clerk";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -7,11 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { useEffect, useRef } from "react";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+import { metaApi, propertiesApi } from "@/lib/api";
 
 export default function AddOfficeSpaceForm() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -19,9 +27,8 @@ export default function AddOfficeSpaceForm() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState<number | "">("");
   const [city, setCity] = useState("");
-  
   const [images, setImages] = useState("");
-  const defaultAmenities = ['WiFi','Parking','Meeting Rooms','Coffee','24/7 Access','Printer','Kitchen','Lounge'];
+  const defaultAmenities = ['WiFi', 'Parking', 'Meeting Rooms', 'Coffee', '24/7 Access', 'Printer', 'Kitchen', 'Lounge'];
   const [availableAmenities, setAvailableAmenities] = useState<string[]>(defaultAmenities);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [selectValue, setSelectValue] = useState<string>("");
@@ -36,27 +43,20 @@ export default function AddOfficeSpaceForm() {
 
     setLoading(true);
     try {
-      const body = {
-        ownerId: user?.id,
-        title,
-        description,
-        price: Number(price),
-        city,
-        amenities: selectedAmenities,
-        images: images ? images.split(",").map(i => i.trim()).filter(Boolean) : [],
-        rating: 0,
-      };
-
-      const res = await fetch("/api/properties", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err?.error || "Failed");
-      }
+      await propertiesApi.create(
+        {
+          title,
+          description,
+          price: Number(price),
+          city,
+          address: city,
+          amenities: selectedAmenities,
+          images: images ? images.split(",").map((image) => image.trim()).filter(Boolean) : [],
+          type: "office",
+          maxGuests: 1,
+        },
+        getToken,
+      );
 
       toast({ title: "Office space added", description: "Your office space was added successfully." });
       setLocation("/my-office-spaces");
@@ -67,61 +67,77 @@ export default function AddOfficeSpaceForm() {
     }
   };
 
-  // Fetch available amenities from server (merge with defaults)
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch('/api/amenities');
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await metaApi.listAmenities();
         if (!mounted) return;
-        if (Array.isArray(data?.amenities)) {
-          setAvailableAmenities((prev) => Array.from(new Set([...defaultAmenities, ...prev, ...data.amenities])));
+        if (Array.isArray(data.amenities)) {
+          setAvailableAmenities((prev) =>
+            Array.from(new Set([...defaultAmenities, ...prev, ...data.amenities])),
+          );
         }
-      } catch (e) {
-        // ignore
+      } catch (_error) {
       }
     })();
-    return () => { mounted = false };
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const toggleAmenity = (a: string) => {
-    setSelectedAmenities(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
-  }
+  const toggleAmenity = (amenity: string) => {
+    setSelectedAmenities((prev) =>
+      prev.includes(amenity) ? prev.filter((item) => item !== amenity) : [...prev, amenity],
+    );
+  };
 
   const onSelectAmenity = (value: string) => {
     if (!value) return;
     if (!selectedAmenities.includes(value)) {
-      setSelectedAmenities(prev => [...prev, value]);
+      setSelectedAmenities((prev) => [...prev, value]);
     }
     setSelectValue("");
-  }
+  };
 
   return (
     <form onSubmit={onSubmit} className="max-w-3xl mx-auto p-6 space-y-6 bg-card rounded-md border">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="title">Title</Label>
-          <Input id="title" required value={title} onChange={e => setTitle(e.target.value)} className="mt-1" />
+          <Input id="title" required value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" />
         </div>
         <div>
-          <Label htmlFor="price">Price (INR ₹)</Label>
-          <Input id="price" required type="number" value={price} onChange={e => setPrice(e.target.value === "" ? "" : Number(e.target.value)) as any} className="mt-1" />
+          <Label htmlFor="price">Price (INR)</Label>
+          <Input
+            id="price"
+            required
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value === "" ? "" : Number(e.target.value))}
+            className="mt-1"
+          />
         </div>
       </div>
 
       <div>
         <Label htmlFor="description">Description</Label>
-        <Textarea id="description" required value={description} onChange={e => setDescription(e.target.value)} className="mt-1" />
+        <Textarea
+          id="description"
+          required
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="mt-1"
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="city">City</Label>
-          <Input id="city" required value={city} onChange={e => setCity(e.target.value)} className="mt-1" />
+          <Input id="city" required value={city} onChange={(e) => setCity(e.target.value)} className="mt-1" />
         </div>
-        <div className="relative">
+        <div>
           <Label htmlFor="amenities">Amenities</Label>
           <div className="mt-1 grid grid-cols-1 gap-2">
             <Select value={selectValue} onValueChange={onSelectAmenity}>
@@ -129,19 +145,21 @@ export default function AddOfficeSpaceForm() {
                 <SelectValue placeholder="Select an amenity" />
               </SelectTrigger>
               <SelectContent>
-                {availableAmenities.map((a) => (
-                  <SelectItem key={a} value={a} disabled={selectedAmenities.includes(a)}>
-                    {a}
+                {availableAmenities.map((amenity) => (
+                  <SelectItem key={amenity} value={amenity} disabled={selectedAmenities.includes(amenity)}>
+                    {amenity}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
             <div className="flex flex-wrap gap-2">
-              {selectedAmenities.map(a => (
-                <Badge key={a} variant="secondary" className="flex items-center gap-2">
-                  {a}
-                  <button type="button" onClick={() => toggleAmenity(a)} className="ml-2 text-xs">✕</button>
+              {selectedAmenities.map((amenity) => (
+                <Badge key={amenity} variant="secondary" className="flex items-center gap-2">
+                  {amenity}
+                  <button type="button" onClick={() => toggleAmenity(amenity)} className="ml-2 text-xs">
+                    x
+                  </button>
                 </Badge>
               ))}
             </div>
@@ -151,11 +169,19 @@ export default function AddOfficeSpaceForm() {
 
       <div>
         <Label htmlFor="images">Images (comma separated URLs)</Label>
-        <Input id="images" placeholder="https://... , https://..." value={images} onChange={e => setImages(e.target.value)} className="mt-1" />
+        <Input
+          id="images"
+          placeholder="https://... , https://..."
+          value={images}
+          onChange={(e) => setImages(e.target.value)}
+          className="mt-1"
+        />
       </div>
 
       <div className="flex items-center justify-end">
-        <Button type="submit" variant="secondary" disabled={loading}>{loading ? "Saving..." : "Add Office Space"}</Button>
+        <Button type="submit" variant="secondary" disabled={loading}>
+          {loading ? "Saving..." : "Add Office Space"}
+        </Button>
       </div>
     </form>
   );

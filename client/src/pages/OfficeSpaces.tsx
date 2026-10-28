@@ -1,122 +1,72 @@
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
+import { Loader2, Briefcase } from 'lucide-react';
+import { useSearch } from 'wouter';
 import { Property, SearchPropertiesParams } from '@shared/schema';
 import { Hero } from '@/components/Hero';
 import { PropertyCard } from '@/components/PropertyCard';
 import { SearchFilters } from '@/components/SearchFilters';
-import { useState, useEffect, useRef } from 'react';
-import { useSearch } from 'wouter';
-import { useAuth } from '@clerk/clerk-react';
-import { Loader2, Briefcase } from 'lucide-react';
-
-function buildQueryString(filters: SearchPropertiesParams) {
-  const params = new URLSearchParams();
-  if (filters.city) params.set('city', filters.city);
-  if (filters.minPrice !== undefined) params.set('minPrice', String(filters.minPrice));
-  if (filters.maxPrice !== undefined) params.set('maxPrice', String(filters.maxPrice));
-  if (filters.rating !== undefined) params.set('rating', String(filters.rating));
-  if (filters.search) params.set('search', filters.search);
-  if (filters.amenities) {
-    if (Array.isArray(filters.amenities)) {
-      if (filters.amenities.length > 0) params.set('amenities', filters.amenities.join(','));
-    } else {
-      // already a CSV string
-      params.set('amenities', String(filters.amenities));
-    }
-  }
-  return params.toString();
-}
+import { propertiesApi } from '@/lib/api';
 
 export default function OfficeSpaces() {
   const searchString = useSearch();
-
+  const { userId, getToken } = useAuth();
   const [filters, setFilters] = useState<SearchPropertiesParams>({});
   const filtersRef = useRef<HTMLDivElement | null>(null);
-
   const [properties, setProperties] = useState<Property[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { userId } = useAuth();
 
-  const fetchProperties = async (f: SearchPropertiesParams) => {
+  const fetchProperties = async (nextFilters: SearchPropertiesParams) => {
     setIsLoading(true);
     try {
-      // normalize amenities: ensure CSV string is passed to the API
-      const qf: any = { ...f };
-      if (Array.isArray(qf.amenities)) {
-        qf.amenities = qf.amenities.map((a: string) => String(a).trim().toLowerCase()).join(',');
-      } else if (typeof qf.amenities === 'string') {
-        qf.amenities = String(qf.amenities).split(',').map(s => s.trim().toLowerCase()).filter(Boolean).join(',');
-      }
-
-      const qs = buildQueryString(qf as SearchPropertiesParams);
-      const url = qs ? `/api/properties?${qs}` : `/api/properties`;
-
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-
-      const data = await res.json();
-      const normalized = (data || []).map((d: any) => ({
-        id: d.id || String(d._id),
-        title: d.title || "",
-        description: d.description || "",
-        images: Array.isArray(d.images) ? d.images : [],
-        city: d.city || "",
-        address: d.address || "",
-        price: d.price ?? d.pricePerNight ?? 0,
-        rating: d.rating || 0,
-        amenities: d.amenities || [],
-      })) as Property[];
-
-      setProperties(normalized);
+      const amenities = Array.isArray(nextFilters.amenities)
+        ? nextFilters.amenities.map((item) => item.trim())
+        : nextFilters.amenities;
+      const data = await propertiesApi.list({ ...nextFilters, amenities, type: 'office' });
+      setProperties(data);
     } catch (err) {
-      console.error("Failed to fetch properties", err);
+      console.error('Failed to fetch properties', err);
       setProperties([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // IMPORTANT: Load results when URL query string changes
   useEffect(() => {
-    const sp = new URLSearchParams(searchString || '');
+    const params = new URLSearchParams(searchString || '');
     const parsed: SearchPropertiesParams = {
-      city: sp.get("city") || undefined,
-      search: sp.get("search") || undefined,
-      minPrice: sp.get("minPrice") ? Number(sp.get("minPrice")) : undefined,
-      maxPrice: sp.get("maxPrice") ? Number(sp.get("maxPrice")) : undefined,
-      rating: sp.get("rating") ? Number(sp.get("rating")) : undefined,
-      amenities: sp.get("amenities") ? sp.get("amenities")!.split(",").filter(Boolean) : [],
+      city: params.get('city') || undefined,
+      search: params.get('search') || undefined,
+      minPrice: params.get('minPrice') ? Number(params.get('minPrice')) : undefined,
+      maxPrice: params.get('maxPrice') ? Number(params.get('maxPrice')) : undefined,
+      rating: params.get('rating') ? Number(params.get('rating')) : undefined,
+      amenities: params.get('amenities') ? params.get('amenities')!.split(',').filter(Boolean) : [],
     };
 
     setFilters(parsed);
     fetchProperties(parsed);
   }, [searchString]);
 
-  // Scroll to filters when Hero triggers a search
   useEffect(() => {
     const handler = () => {
       if (filtersRef.current) {
-        try { filtersRef.current.scrollIntoView({ behavior: 'smooth' }); } catch (e) { /* ignore */ }
+        filtersRef.current.scrollIntoView({ behavior: 'smooth' });
       }
     };
+
     window.addEventListener('scrollToFilters', handler);
     return () => window.removeEventListener('scrollToFilters', handler);
   }, []);
 
-  const handleFilterChange = (newFilters: SearchPropertiesParams) => {
-    setFilters(newFilters);
-    fetchProperties(newFilters);
+  const handleFilterChange = (nextFilters: SearchPropertiesParams) => {
+    setFilters(nextFilters);
+    fetchProperties(nextFilters);
   };
 
   const handleDeleteProperty = async (id: string) => {
     try {
-      const ok = confirm('Are you sure you want to delete this property?');
-      if (!ok) return;
-      const res = await fetch(`/api/properties/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const txt = await res.text();
-        console.error('Failed to delete property', txt);
-        return;
-      }
-      // refresh list after delete
+      if (!confirm('Are you sure you want to delete this property?')) return;
+      await propertiesApi.remove(id, getToken);
       fetchProperties(filters);
     } catch (err) {
       console.error('Delete error', err);
@@ -141,7 +91,11 @@ export default function OfficeSpaces() {
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div ref={filtersRef}>
-          <SearchFilters city={filters.city} amenities={Array.isArray(filters.amenities) ? filters.amenities : []} onFilterChange={handleFilterChange} />
+          <SearchFilters
+            city={filters.city}
+            amenities={Array.isArray(filters.amenities) ? filters.amenities : []}
+            onFilterChange={handleFilterChange}
+          />
         </div>
 
         {isLoading ? (

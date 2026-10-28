@@ -1,0 +1,9 @@
+[build]
+base = "client"
+command = "npm run build:client --prefix .."
+publish = "../dist/public"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
